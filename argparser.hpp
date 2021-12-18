@@ -54,6 +54,7 @@ class ArgParser
     std::unordered_map<std::string, bool> options_flag;
     std::unordered_map<std::string, std::string> options_string;
     std::unordered_map<std::string, int> options_int;
+    std::vector<std::string> unrecognised;
 
     bool default_flag;
     std::string default_string;
@@ -135,6 +136,14 @@ class ArgParser
      */
     int get_int(std::string name);
 
+    /**
+     * get_unrecognised
+     *
+     * Get all unrecognised command line options.
+     *
+     */
+    const std::vector<std::string> &get_unrecognised();
+
     // TODO: help generator
 };
 
@@ -161,13 +170,7 @@ void ArgParser::set_value(Option opt, std::string value)
     }
 }
 
-ArgParser::ArgParser(const std::vector<Option> &options)
-{
-    this->options_.resize(options.size());
-    std::copy(options.begin(), options.end(), this->options_.begin());
-
-    this->set_defaults(false, "", -1);
-}
+ArgParser::ArgParser(const std::vector<Option> &options) : options_(options) {}
 
 void ArgParser::parse(int argc, const char *argv[], int skip_first_n /* = 1 */)
 {
@@ -211,7 +214,8 @@ void ArgParser::parse(int argc, const char *argv[], int skip_first_n /* = 1 */)
                 }
             }
         }
-        // TODO: add handling for unrecognised arguments
+        this->unrecognised.push_back(argv[i]);
+        continue;
     outer_loop:;
     }
 }
@@ -248,6 +252,11 @@ int ArgParser::get_int(std::string name)
         return this->default_int;
     else
         return it->second;
+}
+
+const std::vector<std::string> &ArgParser::get_unrecognised()
+{
+    return this->unrecognised;
 }
 
 } // namespace argp
