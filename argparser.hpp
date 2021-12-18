@@ -184,8 +184,6 @@ void ArgParser::parse(int argc, const char *argv[], int skip_first_n /* = 1 */)
                     if (opt.opt_type == OptionType::FLAG)
                     {
                         this->set_value(opt, "");
-                        // break out of nested for loop
-                        goto outer_loop;
                     }
                     else if (i + 1 < argc)
                     {
@@ -208,6 +206,8 @@ void ArgParser::parse(int argc, const char *argv[], int skip_first_n /* = 1 */)
 
                         throw std::logic_error(msg);
                     }
+                    // break out of nested for loop
+                    goto outer_loop;
                 }
             }
         }
