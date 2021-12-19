@@ -83,8 +83,12 @@ class ArgParser
      * skip_first_n - Ignore this number of strings at the start of argv.
      *   Default value is set to 1 because C/C++ command line arguments
      *   start with program name.
+     *
+     * return - true if all arguments were recognised
+     *        - false if some arguments were not recognised (these can be
+     *          accessed by calling get_unrecognised method)
      */
-    void parse(int argc, const char *argv[], int skip_first_n = 1);
+    bool parse(int argc, const char *argv[], int skip_first_n = 1);
 
     /**
      * set_defaults
@@ -172,7 +176,7 @@ void ArgParser::set_value(Option opt, std::string value)
 
 ArgParser::ArgParser(const std::vector<Option> &options) : options_(options) {}
 
-void ArgParser::parse(int argc, const char *argv[], int skip_first_n /* = 1 */)
+bool ArgParser::parse(int argc, const char *argv[], int skip_first_n /* = 1 */)
 {
     int lenght;
     for (int i = skip_first_n; i < argc; i++)
@@ -218,6 +222,8 @@ void ArgParser::parse(int argc, const char *argv[], int skip_first_n /* = 1 */)
         continue;
     outer_loop:;
     }
+
+    return this->unrecognised.empty();
 }
 
 void ArgParser::set_defaults(bool b, std::string s, int i)
