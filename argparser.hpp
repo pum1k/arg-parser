@@ -5,6 +5,7 @@
 #ifndef ARGPARSER_ARGPARSER_HPP_
 #define ARGPARSER_ARGPARSER_HPP_
 
+#include <iomanip>
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
@@ -42,6 +43,7 @@ struct Option
     std::string name;
     std::vector<std::string> identifiers;
     OptionType opt_type;
+    std::string help;
 };
 
 /**
@@ -148,7 +150,16 @@ class ArgParser
      */
     const std::vector<std::string> &get_unrecognised();
 
-    // TODO: help generator
+    /**
+     * print_help
+     *
+     * Output help to a specified output stream.
+     *
+     * os - output stream
+     * min_w - minimal number of characters that will be used to display
+     *   identifier of an option. Used for aligning help strings.
+     */
+    void print_help(std::ostream &os, int min_w = 15) const;
 };
 
 // DEFINITIONS =================================================================
@@ -174,7 +185,10 @@ void ArgParser::set_value(Option opt, std::string value)
     }
 }
 
-ArgParser::ArgParser(const std::vector<Option> &options) : options_(options) {}
+ArgParser::ArgParser(const std::vector<Option> &options) : options_(options)
+{
+    this->set_defaults(false, "", -1);
+}
 
 bool ArgParser::parse(int argc, const char *argv[], int skip_first_n /* = 1 */)
 {
@@ -263,6 +277,25 @@ int ArgParser::get_int(std::string name)
 const std::vector<std::string> &ArgParser::get_unrecognised()
 {
     return this->unrecognised;
+}
+
+void ArgParser::print_help(std::ostream &os, int min_w /* = 15 */) const
+{
+    auto flags = os.flags();
+    os << std::left;
+    for (Option opt : this->options_)
+    {
+        auto it  = opt.identifiers.begin();
+        auto eit = opt.identifiers.end();
+        while (it + 1 != eit)
+        {
+            os << *it << std::endl;
+            ++it;
+        }
+
+        os << std::setw(min_w) << ((*it) + " ") << opt.help << std::endl;
+    }
+    os.flags(flags);
 }
 
 } // namespace argp
