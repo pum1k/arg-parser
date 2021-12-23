@@ -120,7 +120,7 @@ class ArgParser
      *
      * name - name of the option
      */
-    bool get_flag(std::string name);
+    bool get_flag(const std::string &name) const;
     /**
      * get_string
      *
@@ -130,7 +130,7 @@ class ArgParser
      *
      * name - name of the option
      */
-    std::string get_string(std::string name);
+    std::string get_string(const std::string &name) const;
     /**
      * get_string
      *
@@ -140,7 +140,7 @@ class ArgParser
      *
      * name - name of the option
      */
-    int get_int(std::string name);
+    int get_int(const std::string &name) const;
 
     /**
      * get_unrecognised
@@ -247,7 +247,7 @@ void ArgParser::set_defaults(bool b, std::string s, int i)
     this->default_int    = i;
 }
 
-bool ArgParser::get_flag(std::string name)
+bool ArgParser::get_flag(const std::string &name) const
 {
     auto it = this->options_flag.find(name);
     if (it == this->options_flag.end())
@@ -256,7 +256,7 @@ bool ArgParser::get_flag(std::string name)
         return it->second;
 }
 
-std::string ArgParser::get_string(std::string name)
+std::string ArgParser::get_string(const std::string &name) const
 {
     auto it = this->options_string.find(name);
     if (it == this->options_string.end())
@@ -265,7 +265,7 @@ std::string ArgParser::get_string(std::string name)
         return it->second;
 }
 
-int ArgParser::get_int(std::string name)
+int ArgParser::get_int(const std::string &name) const
 {
     auto it = this->options_int.find(name);
     if (it == this->options_int.end())
