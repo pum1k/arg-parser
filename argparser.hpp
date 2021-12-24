@@ -52,7 +52,7 @@ struct Option
 class ArgParser
 {
  private:
-    std::vector<Option> options_;
+    const std::vector<Option> options_;
     std::unordered_map<std::string, bool> options_flag;
     std::unordered_map<std::string, std::string> options_string;
     std::unordered_map<std::string, int> options_int;
@@ -148,7 +148,7 @@ class ArgParser
      * Get all unrecognised command line options.
      *
      */
-    const std::vector<std::string> &get_unrecognised();
+    const std::vector<std::string> &get_unrecognised() const;
 
     /**
      * print_help
@@ -274,7 +274,7 @@ int ArgParser::get_int(const std::string &name) const
         return it->second;
 }
 
-const std::vector<std::string> &ArgParser::get_unrecognised()
+const std::vector<std::string> &ArgParser::get_unrecognised() const
 {
     return this->unrecognised;
 }
