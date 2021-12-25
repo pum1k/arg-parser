@@ -162,6 +162,8 @@ class ArgParser
     void print_help(std::ostream &os, int min_w = 15) const;
 };
 
+using OptionsVector = std::vector<argp::Option>;
+
 // DEFINITIONS =================================================================
 
 void ArgParser::set_value(Option opt, std::string value)
