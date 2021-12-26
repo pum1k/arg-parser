@@ -166,7 +166,7 @@ using OptionsVector = std::vector<argp::Option>;
 
 // DEFINITIONS =================================================================
 
-void ArgParser::set_value(Option opt, std::string value)
+inline void ArgParser::set_value(Option opt, std::string value)
 {
     switch (opt.opt_type)
     {
@@ -187,12 +187,14 @@ void ArgParser::set_value(Option opt, std::string value)
     }
 }
 
-ArgParser::ArgParser(const std::vector<Option> &options) : options_(options)
+inline ArgParser::ArgParser(const std::vector<Option> &options)
+    : options_(options)
 {
     this->set_defaults(false, "", -1);
 }
 
-bool ArgParser::parse(int argc, const char *argv[], int skip_first_n /* = 1 */)
+inline bool ArgParser::parse(int argc, const char *argv[],
+                             int skip_first_n /* = 1 */)
 {
     int lenght;
     for (int i = skip_first_n; i < argc; i++)
@@ -242,14 +244,14 @@ bool ArgParser::parse(int argc, const char *argv[], int skip_first_n /* = 1 */)
     return this->unrecognised.empty();
 }
 
-void ArgParser::set_defaults(bool b, std::string s, int i)
+inline void ArgParser::set_defaults(bool b, std::string s, int i)
 {
     this->default_flag   = b;
     this->default_string = s;
     this->default_int    = i;
 }
 
-bool ArgParser::get_flag(const std::string &name) const
+inline bool ArgParser::get_flag(const std::string &name) const
 {
     auto it = this->options_flag.find(name);
     if (it == this->options_flag.end())
@@ -258,7 +260,7 @@ bool ArgParser::get_flag(const std::string &name) const
         return it->second;
 }
 
-std::string ArgParser::get_string(const std::string &name) const
+inline std::string ArgParser::get_string(const std::string &name) const
 {
     auto it = this->options_string.find(name);
     if (it == this->options_string.end())
@@ -267,7 +269,7 @@ std::string ArgParser::get_string(const std::string &name) const
         return it->second;
 }
 
-int ArgParser::get_int(const std::string &name) const
+inline int ArgParser::get_int(const std::string &name) const
 {
     auto it = this->options_int.find(name);
     if (it == this->options_int.end())
@@ -276,12 +278,12 @@ int ArgParser::get_int(const std::string &name) const
         return it->second;
 }
 
-const std::vector<std::string> &ArgParser::get_unrecognised() const
+inline const std::vector<std::string> &ArgParser::get_unrecognised() const
 {
     return this->unrecognised;
 }
 
-void ArgParser::print_help(std::ostream &os, int min_w /* = 15 */) const
+inline void ArgParser::print_help(std::ostream &os, int min_w /* = 15 */) const
 {
     auto flags = os.flags();
     os << std::left;
