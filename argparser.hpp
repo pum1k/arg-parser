@@ -196,7 +196,7 @@ inline ArgParser::ArgParser(const std::vector<Option> &options)
 inline bool ArgParser::parse(int argc, const char *argv[],
                              int skip_first_n /* = 1 */)
 {
-    int lenght;
+    std::size_t lenght;
     for (int i = skip_first_n; i < argc; i++)
     {
         lenght = std::char_traits<char>::length(argv[i]);
