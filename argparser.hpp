@@ -196,15 +196,15 @@ inline ArgParser::ArgParser(const std::vector<Option> &options)
 inline bool ArgParser::parse(int argc, const char *argv[],
                              int skip_first_n /* = 1 */)
 {
-    std::size_t lenght;
+    std::size_t length;
     for (int i = skip_first_n; i < argc; i++)
     {
-        lenght = std::char_traits<char>::length(argv[i]);
+        length = std::char_traits<char>::length(argv[i]);
         for (auto opt : this->options_)
         {
             for (std::string str : opt.identifiers)
             {
-                if (str.length() == lenght && str.compare(argv[i]) == 0)
+                if (str.length() == length && str.compare(argv[i]) == 0)
                 {
                     if (opt.opt_type == OptionType::FLAG)
                     {
