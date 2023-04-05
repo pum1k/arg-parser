@@ -6,8 +6,10 @@
 #define ARGPARSER_ARGPARSER_HPP_
 
 #include <iomanip>
+#include <sstream>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <vector>
 
@@ -16,34 +18,109 @@ namespace argp
 // DECLARATIONS ================================================================
 
 /**
- * Expected data type for Option.
+ * This class defines interface that all command line options must use.
  *
- * FLAG - bool (no data after it; true if found, false otherwise)
- * STRING - std::string
- * INT - int
+ * Description of fields:
+ * identifiers - vector of strings that should be matched to this option
+ * help - string describing the option
+ * is_set_ - value indicating, if the default value was overwritten (is set even
+ *          if the new value is the same as the default)
  */
-enum OptionType
+class OptionBase
 {
-    FLAG,
-    STRING,
-    INT,
+ protected:
+    std::vector<std::string> identifiers;
+    std::string help;
+    bool is_set_;
+
+    /**
+     * from_string
+     *
+     * Subclasses overriding this method must parse the options from the list of
+     * string views in the parameter. After that, they are expected to be set
+     * according to the options passed.
+     *
+     * First string in the vector is the identifier, that was matched, then
+     * follows N strings, as requested by get_param_count method.
+     *
+     * This method should throw std::invalid_argument exception if the
+     * conversion could not be done for any reason.
+     */
+    virtual void from_string(const std::vector<std::string_view> &strings) = 0;
+
+ public:
+    OptionBase(std::vector<std::string> identifiers, std::string help);
+
+    /**
+     * parse
+     *
+     * This method is a public wrapper for from_string method that ensures
+     * the is_set_ field is filled after parsing the parameters.
+     */
+    void parse(const std::vector<std::string_view> &strings);
+
+    /**
+     * get_param_count
+     *
+     * This method is used for requesting the number of parameters required to
+     * initialize the option object.
+     *
+     * return value:
+     * - non-negative value - the number of additional parameters required
+     * - `-1` - this options requires all remaining arguments
+     */
+    virtual int get_param_count() = 0;
+
+    const std::vector<std::string> &get_identifiers() const;
+    const std::string &get_help() const;
+    bool is_set() const;
 };
 
 /**
- * Struct holding data about a single command line option that should be
- * parsed.
- * Use these to initialize ArgParser class
+ * This class is a simple option that converts a single string parameter to the
+ * type specified in the template parameter. It uses stream extraction operator
+ * to make this conversion, if the type does not support this operator defined,
+ * you must create a specialization of this template or separate class to parse
+ * it.
  *
- * name - name of the option
- * identifiers - vector of possible command line flags indicating this option
- * opt_type - type of expected data
+ * There are also specializations for these types:
+ * - std::string - convert the whole parameter to the string
+ * - bool - no additional parameters required, false by default, true if found
  */
-struct Option
+template <class T>
+class Option : public OptionBase
 {
-    std::string name;
-    std::vector<std::string> identifiers;
-    OptionType opt_type;
-    std::string help;
+ protected:
+    T val;
+    static constexpr const int NUM_OPTS = 1;
+
+    virtual void from_string(
+        const std::vector<std::string_view> &strings) override;
+
+ public:
+    Option(std::vector<std::string> identifiers, std::string help, T val = T());
+
+    virtual int get_param_count() override;
+
+    T get_val() { return val; }
+};
+
+template <>
+class Option<bool> : public OptionBase
+{
+ protected:
+    bool val;
+    static constexpr const int NUM_OPTS = 0;
+
+    virtual void from_string(
+        const std::vector<std::string_view> &strings) override;
+
+ public:
+    Option(std::vector<std::string> identifiers, std::string help);
+
+    virtual int get_param_count() override;
+
+    bool get_val();
 };
 
 /**
@@ -52,26 +129,20 @@ struct Option
 class ArgParser
 {
  private:
-    const std::vector<Option> options_;
-    std::unordered_map<std::string, bool> options_flag;
-    std::unordered_map<std::string, std::string> options_string;
-    std::unordered_map<std::string, int> options_int;
+    const std::vector<OptionBase *> options_;
     std::vector<std::string> unrecognised;
-
-    bool default_flag;
-    std::string default_string;
-    int default_int;
-
-    void set_value(Option opt, std::string value);
 
  public:
     /**
      * Constructor
      *
      * options - Vector defining options, that should be parsed by the object.
-     *   You cannot remove or add any other later.
+     * You cannot remove or add any other later. Lifetime of option object must
+     * not end before the lifetime of the ArgParser object, if they do, behavior
+     * is undefined.
      */
-    ArgParser(const std::vector<Option> &options);
+    ArgParser(const std::vector<OptionBase *> &options);
+
     /**
      * parse
      *
@@ -93,60 +164,9 @@ class ArgParser
     bool parse(int argc, const char *argv[], int skip_first_n = 1);
 
     /**
-     * set_defaults
-     *
-     * Set values, that should be returned, when the option was not found in
-     * the parsed string.
-     * These values are also returned, when the option was not set during the
-     * initialization of this object.
-     *
-     * If you don't set these, they will be set to:
-     * - flag = false
-     * - string = ""
-     * - int = -1
-     *
-     * b - default flag (bool)
-     * s - default string
-     * i - default int
-     */
-    void set_defaults(bool b, std::string s, int i);
-
-    /**
-     * get_flag
-     *
-     * Get value associated with the specified option, returning default value,
-     * if it wasn't found (more details in set_value).
-     * This option must be of type flag (bool).
-     *
-     * name - name of the option
-     */
-    bool get_flag(const std::string &name) const;
-    /**
-     * get_string
-     *
-     * Get value associated with the specified option, returning default value,
-     * if it wasn't found (more details in set_value).
-     * This option must be of type string.
-     *
-     * name - name of the option
-     */
-    std::string get_string(const std::string &name) const;
-    /**
-     * get_string
-     *
-     * Get value associated with the specified option, returning default value,
-     * if it wasn't found (more details in set_value).
-     * This option must be of type int.
-     *
-     * name - name of the option
-     */
-    int get_int(const std::string &name) const;
-
-    /**
      * get_unrecognised
      *
      * Get all unrecognised command line options.
-     *
      */
     const std::vector<std::string> &get_unrecognised() const;
 
@@ -162,36 +182,82 @@ class ArgParser
     void print_help(std::ostream &os, int min_w = 15) const;
 };
 
-using OptionsVector = std::vector<argp::Option>;
-
 // DEFINITIONS =================================================================
 
-inline void ArgParser::set_value(Option opt, std::string value)
+inline OptionBase::OptionBase(std::vector<std::string> identifiers,
+                              std::string help)
+    : identifiers(identifiers), help(help), is_set_(false)
 {
-    switch (opt.opt_type)
+}
+
+inline void OptionBase::parse(const std::vector<std::string_view> &strings)
+{
+    this->from_string(strings);
+
+    is_set_ = true;
+}
+
+inline const std::vector<std::string> &OptionBase::get_identifiers() const
+{
+    return identifiers;
+}
+
+inline const std::string &OptionBase::get_help() const { return help; }
+
+inline bool OptionBase::is_set() const { return is_set_; }
+
+inline ArgParser::ArgParser(const std::vector<OptionBase *> &options)
+    : options_(options)
+{
+}
+
+template <class T>
+inline void Option<T>::from_string(const std::vector<std::string_view> &strings)
+{
+    std::string str = std::string(strings[1]);
+    std::istringstream iss(str);
+    iss >> this->val;
+    if (!iss)
     {
-    case OptionType::FLAG:
-        this->options_flag.insert({opt.name, true});
-        break;
-
-    case OptionType::STRING:
-        this->options_string.insert({opt.name, value});
-        break;
-
-    case OptionType::INT:
-        this->options_int.insert({opt.name, std::stoi(value)});
-        break;
-
-    default:
-        break;
+        throw std::invalid_argument("Could not parse the data.");
     }
 }
 
-inline ArgParser::ArgParser(const std::vector<Option> &options)
-    : options_(options)
+template <class T>
+inline Option<T>::Option(std::vector<std::string> identifiers, std::string help,
+                         T val /* = T() */)
+    : OptionBase(identifiers, help), val(val)
 {
-    this->set_defaults(false, "", -1);
 }
+
+template <class T>
+inline int Option<T>::get_param_count()
+{
+    return NUM_OPTS;
+}
+
+template <>
+void Option<std::string>::from_string(
+    const std::vector<std::string_view> &strings)
+{
+    this->val = std::string(strings[1]);
+}
+
+inline void Option<bool>::from_string(
+    const std::vector<std::string_view> &strings)
+{
+    this->val = true;
+}
+
+inline Option<bool>::Option(std::vector<std::string> identifiers,
+                            std::string help)
+    : OptionBase(identifiers, help), val(false)
+{
+}
+
+inline int Option<bool>::get_param_count() { return NUM_OPTS; }
+
+inline bool Option<bool>::get_val() { return val; }
 
 inline bool ArgParser::parse(int argc, const char *argv[],
                              int skip_first_n /* = 1 */)
@@ -199,39 +265,40 @@ inline bool ArgParser::parse(int argc, const char *argv[],
     std::size_t length;
     for (int i = skip_first_n; i < argc; i++)
     {
-        length = std::char_traits<char>::length(argv[i]);
         for (auto opt : this->options_)
         {
-            for (std::string str : opt.identifiers)
+            for (const std::string &str : opt->get_identifiers())
             {
-                if (str.length() == length && str.compare(argv[i]) == 0)
+                if (str == argv[i])
                 {
-                    if (opt.opt_type == OptionType::FLAG)
+                    int param_count = opt->get_param_count();
+                    if (param_count < -1)
                     {
-                        this->set_value(opt, "");
+                        throw std::invalid_argument(
+                            "Invalid number of requsted parameters.");
                     }
-                    else if (i + 1 < argc)
-                    {
-                        try
-                        {
-                            this->set_value(opt, argv[++i]);
-                        }
-                        catch (const std::invalid_argument &e)
-                        {
-                            std::string msg = "Invalid argument type after: \"";
-                            msg += str + "\"";
 
-                            throw std::invalid_argument(msg);
-                        }
-                    }
-                    else
+                    if (param_count == -1)
                     {
-                        std::string msg = "Missing argument after: \"";
-                        msg += str + "\"";
-
-                        throw std::logic_error(msg);
+                        param_count = argc - i - 1;
                     }
-                    // break out of nested for loop
+
+                    if (i + param_count >= argc)
+                    {
+                        throw std::out_of_range("Not enough arguments.");
+                    }
+
+                    std::vector<std::string_view> opts;
+                    opts.reserve(param_count + 1);
+
+                    for (int end = i + param_count + 1; i < end; i++)
+                    {
+                        opts.push_back(std::string_view(argv[i]));
+                    }
+                    --i;
+
+                    opt->parse(opts);
+
                     goto outer_loop;
                 }
             }
@@ -244,40 +311,6 @@ inline bool ArgParser::parse(int argc, const char *argv[],
     return this->unrecognised.empty();
 }
 
-inline void ArgParser::set_defaults(bool b, std::string s, int i)
-{
-    this->default_flag   = b;
-    this->default_string = s;
-    this->default_int    = i;
-}
-
-inline bool ArgParser::get_flag(const std::string &name) const
-{
-    auto it = this->options_flag.find(name);
-    if (it == this->options_flag.end())
-        return this->default_flag;
-    else
-        return it->second;
-}
-
-inline std::string ArgParser::get_string(const std::string &name) const
-{
-    auto it = this->options_string.find(name);
-    if (it == this->options_string.end())
-        return this->default_string;
-    else
-        return it->second;
-}
-
-inline int ArgParser::get_int(const std::string &name) const
-{
-    auto it = this->options_int.find(name);
-    if (it == this->options_int.end())
-        return this->default_int;
-    else
-        return it->second;
-}
-
 inline const std::vector<std::string> &ArgParser::get_unrecognised() const
 {
     return this->unrecognised;
@@ -287,17 +320,17 @@ inline void ArgParser::print_help(std::ostream &os, int min_w /* = 15 */) const
 {
     auto flags = os.flags();
     os << std::left;
-    for (Option opt : this->options_)
+    for (OptionBase *opt : this->options_)
     {
-        auto it  = opt.identifiers.begin();
-        auto eit = opt.identifiers.end();
+        auto it  = opt->get_identifiers().begin();
+        auto eit = opt->get_identifiers().end();
         while (it + 1 != eit)
         {
             os << *it << std::endl;
             ++it;
         }
 
-        os << std::setw(min_w) << ((*it) + " ") << opt.help << std::endl;
+        os << std::setw(min_w) << ((*it) + " ") << opt->get_help() << std::endl;
     }
     os.flags(flags);
 }
