@@ -92,7 +92,7 @@ class Option : public OptionBase
 {
  protected:
     T val;
-    static constexpr const int NUM_OPTS = 1;
+    static const int NUM_OPTS;
 
     virtual void from_string(
         const std::vector<std::string_view> &strings) override;
@@ -103,24 +103,6 @@ class Option : public OptionBase
     virtual int get_param_count() override;
 
     T get_val() { return val; }
-};
-
-template <>
-class Option<bool> : public OptionBase
-{
- protected:
-    bool val;
-    static constexpr const int NUM_OPTS = 0;
-
-    virtual void from_string(
-        const std::vector<std::string_view> &strings) override;
-
- public:
-    Option(std::vector<std::string> identifiers, std::string help);
-
-    virtual int get_param_count() override;
-
-    bool get_val();
 };
 
 /**
@@ -212,6 +194,12 @@ inline ArgParser::ArgParser(const std::vector<OptionBase *> &options)
 }
 
 template <class T>
+inline constexpr const int Option<T>::NUM_OPTS = 1;
+
+template <>
+inline constexpr const int Option<bool>::NUM_OPTS = 0;
+
+template <class T>
 inline void Option<T>::from_string(const std::vector<std::string_view> &strings)
 {
     std::string str = std::string(strings[1]);
@@ -237,27 +225,18 @@ inline int Option<T>::get_param_count()
 }
 
 template <>
-void Option<std::string>::from_string(
+inline void Option<std::string>::from_string(
     const std::vector<std::string_view> &strings)
 {
     this->val = std::string(strings[1]);
 }
 
+template <>
 inline void Option<bool>::from_string(
     const std::vector<std::string_view> &strings)
 {
     this->val = true;
 }
-
-inline Option<bool>::Option(std::vector<std::string> identifiers,
-                            std::string help)
-    : OptionBase(identifiers, help), val(false)
-{
-}
-
-inline int Option<bool>::get_param_count() { return NUM_OPTS; }
-
-inline bool Option<bool>::get_val() { return val; }
 
 inline bool ArgParser::parse(int argc, const char *argv[],
                              int skip_first_n /* = 1 */)
