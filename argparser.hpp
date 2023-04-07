@@ -102,7 +102,7 @@ class Option : public OptionBase
 
     virtual int get_param_count() override;
 
-    T get_val() { return val; }
+    T get_val() const;
 };
 
 /**
@@ -113,6 +113,25 @@ class ArgParser
  private:
     const std::vector<OptionBase *> options_;
     std::vector<std::string> unrecognised;
+
+    /**
+     * match_option
+     *
+     * Internal method for finding if any option matches the curent argument
+     * parsed.
+     *
+     * return value:
+     * - matching option or nullptr if no option is matched
+     */
+    OptionBase *match_option(const char *arg);
+
+    /**
+     * handle_match
+     *
+     * Internal method, that calls option's parse method with the right number
+     * of arguments when it is found.
+     */
+    void handle_match(int &i, OptionBase *opt, int argc, const char *argv[]);
 
  public:
     /**
@@ -128,13 +147,11 @@ class ArgParser
     /**
      * parse
      *
-     * Parse string(*) array and store options specified int this
-     * object's constructor.
+     * Parse string array and store options specified in this object's
+     * constructor.
      *
-     *  (*)In context of this function, string means null-terminated char array.
-     *
-     * argc - number of strings(*) in argv
-     * argv - array of strings(*) to parse
+     * argc - number of c-style strings in argv
+     * argv - array of c-style strings to parse
      * skip_first_n - Ignore this number of strings at the start of argv.
      *   Default value is set to 1 because C/C++ command line arguments
      *   start with program name.
@@ -188,11 +205,6 @@ inline const std::string &OptionBase::get_help() const { return help; }
 
 inline bool OptionBase::is_set() const { return is_set_; }
 
-inline ArgParser::ArgParser(const std::vector<OptionBase *> &options)
-    : options_(options)
-{
-}
-
 template <class T>
 inline constexpr const int Option<T>::NUM_OPTS = 1;
 
@@ -211,19 +223,6 @@ inline void Option<T>::from_string(const std::vector<std::string_view> &strings)
     }
 }
 
-template <class T>
-inline Option<T>::Option(std::vector<std::string> identifiers, std::string help,
-                         T val /* = T() */)
-    : OptionBase(identifiers, help), val(val)
-{
-}
-
-template <class T>
-inline int Option<T>::get_param_count()
-{
-    return NUM_OPTS;
-}
-
 template <>
 inline void Option<std::string>::from_string(
     const std::vector<std::string_view> &strings)
@@ -238,53 +237,92 @@ inline void Option<bool>::from_string(
     this->val = true;
 }
 
+template <class T>
+inline Option<T>::Option(std::vector<std::string> identifiers, std::string help,
+                         T val /* = T() */)
+    : OptionBase(identifiers, help), val(val)
+{
+}
+
+template <class T>
+inline int Option<T>::get_param_count()
+{
+    return NUM_OPTS;
+}
+
+template <typename T>
+inline T Option<T>::get_val() const
+{
+    return val;
+}
+
+inline OptionBase *ArgParser::match_option(const char *arg)
+{
+    for (auto opt : this->options_)
+    {
+        for (const std::string &str : opt->get_identifiers())
+        {
+            if (str == arg)
+            {
+                return opt;
+            }
+        }
+    }
+
+    return nullptr;
+}
+
+inline void ArgParser::handle_match(int &i, OptionBase *opt, int argc,
+                                    const char *argv[])
+{
+    int param_count = opt->get_param_count();
+    if (param_count < -1)
+    {
+        throw std::invalid_argument("Invalid number of requested parameters.");
+    }
+
+    if (param_count == -1)
+    {
+        param_count = argc - i - 1;
+    }
+
+    if (i + param_count >= argc)
+    {
+        throw std::out_of_range("Not enough arguments.");
+    }
+
+    std::vector<std::string_view> opts;
+    opts.reserve(param_count + 1);
+
+    for (int end = i + param_count + 1; i < end; i++)
+    {
+        opts.push_back(std::string_view(argv[i]));
+    }
+    --i;
+
+    opt->parse(opts);
+}
+
+inline ArgParser::ArgParser(const std::vector<OptionBase *> &options)
+    : options_(options)
+{
+}
+
 inline bool ArgParser::parse(int argc, const char *argv[],
                              int skip_first_n /* = 1 */)
 {
-    std::size_t length;
     for (int i = skip_first_n; i < argc; i++)
     {
-        for (auto opt : this->options_)
+        OptionBase *opt = this->match_option(argv[i]);
+        if (opt != nullptr)
         {
-            for (const std::string &str : opt->get_identifiers())
-            {
-                if (str == argv[i])
-                {
-                    int param_count = opt->get_param_count();
-                    if (param_count < -1)
-                    {
-                        throw std::invalid_argument(
-                            "Invalid number of requsted parameters.");
-                    }
-
-                    if (param_count == -1)
-                    {
-                        param_count = argc - i - 1;
-                    }
-
-                    if (i + param_count >= argc)
-                    {
-                        throw std::out_of_range("Not enough arguments.");
-                    }
-
-                    std::vector<std::string_view> opts;
-                    opts.reserve(param_count + 1);
-
-                    for (int end = i + param_count + 1; i < end; i++)
-                    {
-                        opts.push_back(std::string_view(argv[i]));
-                    }
-                    --i;
-
-                    opt->parse(opts);
-
-                    goto outer_loop;
-                }
-            }
+            this->handle_match(i, opt, argc, argv);
         }
-        this->unrecognised.push_back(argv[i]);
+        else
+        {
+            this->unrecognised.push_back(argv[i]);
+        }
         continue;
-    outer_loop:;
     }
 
     return this->unrecognised.empty();
