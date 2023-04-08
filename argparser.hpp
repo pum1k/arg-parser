@@ -5,17 +5,39 @@
 #ifndef ARGPARSER_ARGPARSER_HPP_
 #define ARGPARSER_ARGPARSER_HPP_
 
+#include <algorithm>
 #include <iomanip>
+#include <numeric>
 #include <sstream>
 #include <stdexcept>
 #include <string>
 #include <string_view>
-#include <unordered_map>
 #include <vector>
 
 namespace argp
 {
-// DECLARATIONS ================================================================
+struct split_options;
+class OptionBase;
+class PositionalOptionBase;
+class KeywordOptionBase;
+template <class T>
+class PositionalOption;
+template <class T>
+class KeywordOption;
+
+struct split_options
+{
+    enum Type
+    {
+        POSITIONAL,
+        KEYWORD
+    };
+
+    std::vector<PositionalOptionBase *> positional;
+    std::vector<KeywordOptionBase *> keyword;
+
+    split_options(const std::vector<OptionBase *> &options);
+};
 
 /**
  * This class defines interface that all command line options must use.
@@ -29,8 +51,6 @@ namespace argp
 class OptionBase
 {
  protected:
-    std::vector<std::string> identifiers;
-    std::string help;
     bool is_set_;
 
     /**
@@ -49,7 +69,8 @@ class OptionBase
     virtual void from_string(const std::vector<std::string_view> &strings) = 0;
 
  public:
-    OptionBase(std::vector<std::string> identifiers, std::string help);
+    OptionBase();
+    virtual ~OptionBase(){};
 
     /**
      * parse
@@ -71,24 +92,112 @@ class OptionBase
      */
     virtual int get_param_count() = 0;
 
-    const std::vector<std::string> &get_identifiers() const;
-    const std::string &get_help() const;
+    /**
+     * matches
+     *
+     * This method tells the parser, if the option matches the identifier from
+     * command line. Returning false continues search for matching option. If
+     * the methods returns true, the parse method of the object is called with
+     * the right argument count.
+     */
+    virtual bool matches(std::string_view identifier) = 0;
+
+    /**
+     * get_help
+     *
+     * Returns two strings -- first should be the name / identifiers of the
+     * option, second should be a brief description.
+     */
+    virtual std::pair<std::string, std::string> get_help() const = 0;
+
+    virtual split_options::Type get_type() const = 0;
+
     bool is_set() const;
 };
 
 /**
- * This class is a simple option that converts a single string parameter to the
- * type specified in the template parameter. It uses stream extraction operator
- * to make this conversion, if the type does not support this operator defined,
- * you must create a specialization of this template or separate class to parse
- * it.
+ * Base class for defining positional arguments.
+ *
+ * When parsing, all keyword arguments (returning KEYWORD from get_type) are
+ * tried before calling matches on any subclass of this class.
+ */
+class PositionalOptionBase : public OptionBase
+{
+ protected:
+    std::string name;
+    std::string help;
+    bool is_required;
+
+ public:
+    PositionalOptionBase(std::string name, std::string help, bool is_required);
+
+    virtual std::pair<std::string, std::string> get_help() const override;
+    virtual split_options::Type get_type() const override;
+};
+
+/**
+ * Base class for defining keyword arguments.
+ */
+class KeywordOptionBase : public OptionBase
+{
+ protected:
+    std::vector<std::string> identifiers;
+    std::string help;
+
+ public:
+    KeywordOptionBase(std::vector<std::string> identifiers, std::string help);
+
+    virtual std::pair<std::string, std::string> get_help() const override;
+    virtual split_options::Type get_type() const override;
+};
+
+/**
+ * This class declares a simple positional argument. It tries to parse the first
+ * argument that it is given.
+ *
+ * It converts a single string parameter to the type specified in the template
+ * parameter. It uses stream extraction operator to make this conversion, if the
+ * type does not support this operator, you must create either it,
+ * a specialization of this template or separate class to parse it.
+ *
+ * There are also specializations for these types:
+ * - std::string - convert the whole parameter to the string
+ */
+template <class T>
+class PositionalOption : public PositionalOptionBase
+{
+ protected:
+    T val;
+
+    virtual void from_string(
+        const std::vector<std::string_view> &strings) override;
+
+ public:
+    PositionalOption(std::string name, std::string help, bool is_required,
+                     T val = T());
+
+    virtual int get_param_count() override;
+    virtual bool matches(std::string_view identifier) override;
+
+    T get_val() const;
+};
+
+/**
+ * This class declares a simple keyword argument. It matches arguments by
+ * comparing the command line arguments with the values stored in identifiers
+ * field.
+ *
+ * It converts a single string parameter to the type specified in the template
+ * parameter. It uses stream extraction operator to make this conversion, if the
+ * type does not support this operator, you must create either it,
+ * a specialization of this template or separate class to parse it.
  *
  * There are also specializations for these types:
  * - std::string - convert the whole parameter to the string
  * - bool - no additional parameters required, false by default, true if found
  */
 template <class T>
-class Option : public OptionBase
+class KeywordOption : public KeywordOptionBase
 {
  protected:
     T val;
@@ -98,9 +207,11 @@ class Option : public OptionBase
         const std::vector<std::string_view> &strings) override;
 
  public:
-    Option(std::vector<std::string> identifiers, std::string help, T val = T());
+    KeywordOption(std::vector<std::string> identifiers, std::string help,
+                  T val = T());
 
     virtual int get_param_count() override;
+    virtual bool matches(std::string_view identifier) override;
 
     T get_val() const;
 };
@@ -178,180 +289,12 @@ class ArgParser
      * min_w - minimal number of characters that will be used to display
      *   identifier of an option. Used for aligning help strings.
      */
-    void print_help(std::ostream &os, int min_w = 15) const;
+    void print_help(std::ostream &os, std::string_view cmd,
+                    int min_w = 25) const;
 };
 
-// DEFINITIONS =================================================================
-
-inline OptionBase::OptionBase(std::vector<std::string> identifiers,
-                              std::string help)
-    : identifiers(identifiers), help(help), is_set_(false)
-{
-}
-
-inline void OptionBase::parse(const std::vector<std::string_view> &strings)
-{
-    this->from_string(strings);
-
-    is_set_ = true;
-}
-
-inline const std::vector<std::string> &OptionBase::get_identifiers() const
-{
-    return identifiers;
-}
-
-inline const std::string &OptionBase::get_help() const { return help; }
-
-inline bool OptionBase::is_set() const { return is_set_; }
-
-template <class T>
-inline constexpr const int Option<T>::NUM_OPTS = 1;
-
-template <>
-inline constexpr const int Option<bool>::NUM_OPTS = 0;
-
-template <class T>
-inline void Option<T>::from_string(const std::vector<std::string_view> &strings)
-{
-    std::string str = std::string(strings[1]);
-    std::istringstream iss(str);
-    iss >> this->val;
-    if (!iss)
-    {
-        throw std::invalid_argument("Could not parse the data.");
-    }
-}
-
-template <>
-inline void Option<std::string>::from_string(
-    const std::vector<std::string_view> &strings)
-{
-    this->val = std::string(strings[1]);
-}
-
-template <>
-inline void Option<bool>::from_string(
-    const std::vector<std::string_view> &strings)
-{
-    this->val = true;
-}
-
-template <class T>
-inline Option<T>::Option(std::vector<std::string> identifiers, std::string help,
-                         T val /* = T() */)
-    : OptionBase(identifiers, help), val(val)
-{
-}
-
-template <class T>
-inline int Option<T>::get_param_count()
-{
-    return NUM_OPTS;
-}
-
-template <typename T>
-inline T Option<T>::get_val() const
-{
-    return val;
-}
-
-inline OptionBase *ArgParser::match_option(const char *arg)
-{
-    for (auto opt : this->options_)
-    {
-        for (const std::string &str : opt->get_identifiers())
-        {
-            if (str == arg)
-            {
-                return opt;
-            }
-        }
-    }
-
-    return nullptr;
-}
-
-inline void ArgParser::handle_match(int &i, OptionBase *opt, int argc,
-                                    const char *argv[])
-{
-    int param_count = opt->get_param_count();
-    if (param_count < -1)
-    {
-        throw std::invalid_argument("Invalid number of requested parameters.");
-    }
-
-    if (param_count == -1)
-    {
-        param_count = argc - i - 1;
-    }
-
-    if (i + param_count >= argc)
-    {
-        throw std::out_of_range("Not enough arguments.");
-    }
-
-    std::vector<std::string_view> opts;
-    opts.reserve(param_count + 1);
-
-    for (int end = i + param_count + 1; i < end; i++)
-    {
-        opts.push_back(std::string_view(argv[i]));
-    }
-    --i;
-
-    opt->parse(opts);
-}
-
-inline ArgParser::ArgParser(const std::vector<OptionBase *> &options)
-    : options_(options)
-{
-}
-
-inline bool ArgParser::parse(int argc, const char *argv[],
-                             int skip_first_n /* = 1 */)
-{
-    for (int i = skip_first_n; i < argc; i++)
-    {
-        OptionBase *opt = this->match_option(argv[i]);
-        if (opt != nullptr)
-        {
-            this->handle_match(i, opt, argc, argv);
-        }
-        else
-        {
-            this->unrecognised.push_back(argv[i]);
-        }
-        continue;
-    }
-
-    return this->unrecognised.empty();
-}
-
-inline const std::vector<std::string> &ArgParser::get_unrecognised() const
-{
-    return this->unrecognised;
-}
-
-inline void ArgParser::print_help(std::ostream &os, int min_w /* = 15 */) const
-{
-    auto flags = os.flags();
-    os << std::left;
-    for (OptionBase *opt : this->options_)
-    {
-        auto it  = opt->get_identifiers().begin();
-        auto eit = opt->get_identifiers().end();
-        while (it + 1 != eit)
-        {
-            os << *it << std::endl;
-            ++it;
-        }
-
-        os << std::setw(min_w) << ((*it) + " ") << opt->get_help() << std::endl;
-    }
-    os.flags(flags);
-}
-
 } // namespace argp
+
+#include "argparser.tpp"
 
 #endif // ARGPARSER_ARGPARSER_HPP_
