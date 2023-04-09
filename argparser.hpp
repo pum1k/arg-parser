@@ -216,82 +216,79 @@ class KeywordOption : public KeywordOptionBase
     T get_val() const;
 };
 
+namespace impl
+{
+
 /**
- * Class for parsing command line options.
+ * match_option
+ *
+ * Internal function for finding if any option matches the curent argument
+ * parsed.
+ *
+ * return value:
+ * - matching option or nullptr if no option is matched
  */
-class ArgParser
+OptionBase *match_option(const char *arg,
+                         const std::vector<OptionBase *> &opts);
+
+/**
+ * handle_match
+ *
+ * Internal function that calls option's parse method with the right number
+ * of arguments when it is found.
+ */
+void handle_match(int &i, OptionBase *opt, int argc, const char *argv[]);
+
+class indented
 {
  private:
-    const std::vector<OptionBase *> options_;
-    std::vector<std::string> unrecognised;
-
-    /**
-     * match_option
-     *
-     * Internal method for finding if any option matches the curent argument
-     * parsed.
-     *
-     * return value:
-     * - matching option or nullptr if no option is matched
-     */
-    OptionBase *match_option(const char *arg);
-
-    /**
-     * handle_match
-     *
-     * Internal method, that calls option's parse method with the right number
-     * of arguments when it is found.
-     */
-    void handle_match(int &i, OptionBase *opt, int argc, const char *argv[]);
+    std::string_view str;
+    int width;
+    char fill;
 
  public:
-    /**
-     * Constructor
-     *
-     * options - Vector defining options, that should be parsed by the object.
-     * You cannot remove or add any other later. Lifetime of option object must
-     * not end before the lifetime of the ArgParser object, if they do, behavior
-     * is undefined.
-     */
-    ArgParser(const std::vector<OptionBase *> &options);
+    indented(std::string_view str, int width, char fill = ' ');
 
-    /**
-     * parse
-     *
-     * Parse string array and store options specified in this object's
-     * constructor.
-     *
-     * argc - number of c-style strings in argv
-     * argv - array of c-style strings to parse
-     * skip_first_n - Ignore this number of strings at the start of argv.
-     *   Default value is set to 1 because C/C++ command line arguments
-     *   start with program name.
-     *
-     * return - true if all arguments were recognised
-     *        - false if some arguments were not recognised (these can be
-     *          accessed by calling get_unrecognised method)
-     */
-    bool parse(int argc, const char *argv[], int skip_first_n = 1);
-
-    /**
-     * get_unrecognised
-     *
-     * Get all unrecognised command line options.
-     */
-    const std::vector<std::string> &get_unrecognised() const;
-
-    /**
-     * print_help
-     *
-     * Output help to a specified output stream.
-     *
-     * os - output stream
-     * min_w - minimal number of characters that will be used to display
-     *   identifier of an option. Used for aligning help strings.
-     */
-    void print_help(std::ostream &os, std::string_view cmd,
-                    int min_w = 25) const;
+    friend std::ostream &operator<<(std::ostream &os, const indented &val);
 };
+
+} // namespace impl
+
+/**
+ * parse
+ *
+ * Parse string array according to the options given in the argument.
+ *
+ * argc - number of c-style strings in argv
+ * argv - array of c-style strings to parse
+ *
+ * opts - vector of options to be parsed from the input
+ *
+ * skip_first_n - Ignore this number of strings at the start of argv.
+ *   Default value is set to 1 because C/C++ command line arguments
+ *   start with program name.
+ *
+ * return - true if all arguments were recognised
+ *        - false if some arguments were not recognised (these can be
+ *          accessed by calling get_unrecognised method)
+ */
+std::vector<std::string> parse(int argc, const char *argv[],
+                               const std::vector<OptionBase *> &opts,
+                               int skip_first_n = 1);
+
+/**
+ * print_help
+ *
+ * Output help to a specified output stream.
+ *
+ * os - output stream
+ * cmd - command to be printed in the first line (`Usage: <cmd> <params>`)
+ * opts - options for which the help should be printed
+ * min_w - minimal number of characters that will be used to display
+ *   identifier of an option. Used for aligning help strings.
+ */
+void print_help(std::ostream &os, std::string_view cmd,
+                const std::vector<OptionBase *> &opts, int min_w = 25);
 
 } // namespace argp
 

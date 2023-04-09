@@ -201,9 +201,13 @@ inline T KeywordOption<T>::get_val() const
     return val;
 }
 
-inline OptionBase *ArgParser::match_option(const char *arg)
+namespace impl
 {
-    auto split_opts = split_options(this->options_);
+
+inline OptionBase *match_option(const char *arg,
+                                const std::vector<OptionBase *> &opts)
+{
+    auto split_opts = split_options(opts);
 
     for (auto opt : split_opts.keyword)
     {
@@ -224,8 +228,7 @@ inline OptionBase *ArgParser::match_option(const char *arg)
     return nullptr;
 }
 
-inline void ArgParser::handle_match(int &i, OptionBase *opt, int argc,
-                                    const char *argv[])
+inline void handle_match(int &i, OptionBase *opt, int argc, const char *argv[])
 {
     int param_count = opt->get_param_count();
     if (param_count < -1)
@@ -255,51 +258,11 @@ inline void ArgParser::handle_match(int &i, OptionBase *opt, int argc,
     opt->parse(opts);
 }
 
-inline ArgParser::ArgParser(const std::vector<OptionBase *> &options)
-    : options_(options)
+inline indented::indented(std::string_view str, int width,
+                          char fill /* = ' ' */)
+    : str(str), width(width), fill(fill)
 {
 }
-
-inline bool ArgParser::parse(int argc, const char *argv[],
-                             int skip_first_n /* = 1 */)
-{
-    for (int i = skip_first_n; i < argc; i++)
-    {
-        OptionBase *opt = this->match_option(argv[i]);
-        if (opt != nullptr)
-        {
-            this->handle_match(i, opt, argc, argv);
-        }
-        else
-        {
-            this->unrecognised.push_back(argv[i]);
-        }
-        continue;
-    }
-
-    return this->unrecognised.empty();
-}
-
-inline const std::vector<std::string> &ArgParser::get_unrecognised() const
-{
-    return this->unrecognised;
-}
-
-class indented
-{
- private:
-    std::string_view str;
-    int width;
-    char fill;
-
- public:
-    indented(std::string_view str, int width, char fill = ' ')
-        : str(str), width(width), fill(fill)
-    {
-    }
-
-    friend std::ostream &operator<<(std::ostream &os, const indented &val);
-};
 
 inline std::ostream &operator<<(std::ostream &os, const indented &val)
 {
@@ -318,20 +281,36 @@ inline std::ostream &operator<<(std::ostream &os, const indented &val)
     return os;
 }
 
-inline void ArgParser::print_help(std::ostream &os, std::string_view cmd,
-                                  int min_w /* = 25 */) const
+} // namespace impl
+
+inline std::vector<std::string> parse(int argc, const char *argv[],
+                                      const std::vector<OptionBase *> &opts,
+                                      int skip_first_n /* = 1 */)
 {
-    // std::vector<PositionalOptionBase *> pos_opts;
-    // for (auto opt : this->options_)
-    // {
-    //     PositionalOptionBase *pos_opt =
-    //         dynamic_cast<PositionalOptionBase *>(opt);
-    //     if (pos_opt != nullptr)
-    //     {
-    //         pos_opts.push_back(pos_opt);
-    //     }
-    // }
-    auto split_opts = split_options(this->options_);
+    std::vector<std::string> unrecognised;
+
+    for (int i = skip_first_n; i < argc; i++)
+    {
+        OptionBase *opt = impl::match_option(argv[i], opts);
+        if (opt != nullptr)
+        {
+            impl::handle_match(i, opt, argc, argv);
+        }
+        else
+        {
+            unrecognised.push_back(argv[i]);
+        }
+        continue;
+    }
+
+    return unrecognised;
+}
+
+inline void print_help(std::ostream &os, std::string_view cmd,
+                       const std::vector<OptionBase *> &opts,
+                       int min_w /* = 25 */)
+{
+    auto split_opts = split_options(opts);
 
     auto flags = os.flags();
     os << std::left;
@@ -348,7 +327,7 @@ inline void ArgParser::print_help(std::ostream &os, std::string_view cmd,
     }
     os << "\nOptions:\n";
 
-    for (OptionBase *opt : this->options_)
+    for (OptionBase *opt : opts)
     {
         std::pair<std::string, std::string> &&help = opt->get_help();
 
@@ -360,7 +339,7 @@ inline void ArgParser::print_help(std::ostream &os, std::string_view cmd,
         {
             os << help.first << "\n" << std::setw(min_w) << "";
         }
-        os << indented(help.second, min_w) << "\n";
+        os << impl::indented(help.second, min_w) << "\n";
     }
     os.flags(flags);
 }
