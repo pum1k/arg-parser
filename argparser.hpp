@@ -177,7 +177,7 @@ class PositionalOption : public PositionalOptionBase
                      T val = T());
 
     virtual int get_param_count() override;
-    virtual bool matches(std::string_view identifier) override;
+    virtual bool matches(std::string_view) override;
 
     T get_val() const;
 };
@@ -243,11 +243,11 @@ class indented
 {
  private:
     std::string_view str;
-    int width;
+    size_t width;
     char fill;
 
  public:
-    indented(std::string_view str, int width, char fill = ' ');
+    indented(std::string_view str, size_t width, char fill = ' ');
 
     friend std::ostream &operator<<(std::ostream &os, const indented &val);
 };
@@ -288,7 +288,7 @@ std::vector<std::string> parse(int argc, const char *argv[],
  *   identifier of an option. Used for aligning help strings.
  */
 void print_help(std::ostream &os, std::string_view cmd,
-                const std::vector<OptionBase *> &opts, int min_w = 25);
+                const std::vector<OptionBase *> &opts, size_t min_w = 25);
 
 } // namespace argp
 

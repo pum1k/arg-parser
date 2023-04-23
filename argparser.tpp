@@ -6,7 +6,7 @@
 namespace argp
 {
 
-split_options::split_options(const std::vector<OptionBase *> &options)
+inline split_options::split_options(const std::vector<OptionBase *> &options)
 {
     for (auto opt : options)
     {
@@ -42,7 +42,8 @@ inline PositionalOptionBase::PositionalOptionBase(std::string name,
 {
 }
 
-std::pair<std::string, std::string> PositionalOptionBase::get_help() const
+inline std::pair<std::string, std::string> PositionalOptionBase::get_help()
+    const
 {
     return {(this->is_required) ? this->name : "[" + this->name + "]",
             this->help};
@@ -59,7 +60,7 @@ inline KeywordOptionBase::KeywordOptionBase(
 {
 }
 
-std::pair<std::string, std::string> KeywordOptionBase::get_help() const
+inline std::pair<std::string, std::string> KeywordOptionBase::get_help() const
 {
     int length = std::accumulate(
         this->identifiers.begin(), this->identifiers.end(), 0,
@@ -111,8 +112,9 @@ inline void PositionalOption<std::string>::from_string(
 }
 
 template <class T>
-PositionalOption<T>::PositionalOption(std::string name, std::string help,
-                                      bool is_required, T val /* = T() */)
+inline PositionalOption<T>::PositionalOption(std::string name, std::string help,
+                                             bool is_required,
+                                             T val /* = T() */)
     : PositionalOptionBase(name, help, is_required), val(val)
 {
 }
@@ -124,7 +126,7 @@ inline int PositionalOption<T>::get_param_count()
 }
 
 template <class T>
-inline bool PositionalOption<T>::matches(std::string_view identifier)
+inline bool PositionalOption<T>::matches(std::string_view)
 {
     return !this->is_set();
 }
@@ -163,7 +165,7 @@ inline void KeywordOption<std::string>::from_string(
 
 template <>
 inline void KeywordOption<bool>::from_string(
-    const std::vector<std::string_view> &strings)
+    const std::vector<std::string_view> &)
 {
     this->val = true;
 }
@@ -258,7 +260,7 @@ inline void handle_match(int &i, OptionBase *opt, int argc, const char *argv[])
     opt->parse(opts);
 }
 
-inline indented::indented(std::string_view str, int width,
+inline indented::indented(std::string_view str, size_t width,
                           char fill /* = ' ' */)
     : str(str), width(width), fill(fill)
 {
@@ -308,7 +310,7 @@ inline std::vector<std::string> parse(int argc, const char *argv[],
 
 inline void print_help(std::ostream &os, std::string_view cmd,
                        const std::vector<OptionBase *> &opts,
-                       int min_w /* = 25 */)
+                       size_t min_w /* = 25 */)
 {
     auto split_opts = split_options(opts);
 
