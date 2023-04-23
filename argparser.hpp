@@ -25,6 +25,8 @@ class PositionalOption;
 template <class T>
 class KeywordOption;
 
+using OptionsList = std::vector<OptionBase *>;
+
 struct split_options
 {
     enum Type
@@ -36,7 +38,7 @@ struct split_options
     std::vector<PositionalOptionBase *> positional;
     std::vector<KeywordOptionBase *> keyword;
 
-    split_options(const std::vector<OptionBase *> &options);
+    split_options(const OptionsList &options);
 };
 
 /**
@@ -228,8 +230,7 @@ namespace impl
  * return value:
  * - matching option or nullptr if no option is matched
  */
-OptionBase *match_option(const char *arg,
-                         const std::vector<OptionBase *> &opts);
+OptionBase *match_option(const char *arg, const OptionsList &opts);
 
 /**
  * handle_match
@@ -273,8 +274,7 @@ class indented
  *          accessed by calling get_unrecognised method)
  */
 std::vector<std::string> parse(int argc, const char *argv[],
-                               const std::vector<OptionBase *> &opts,
-                               int skip_first_n = 1);
+                               const OptionsList &opts, int skip_first_n = 1);
 
 /**
  * print_help
@@ -287,8 +287,8 @@ std::vector<std::string> parse(int argc, const char *argv[],
  * min_w - minimal number of characters that will be used to display
  *   identifier of an option. Used for aligning help strings.
  */
-void print_help(std::ostream &os, std::string_view cmd,
-                const std::vector<OptionBase *> &opts, size_t min_w = 25);
+void print_help(std::ostream &os, std::string_view cmd, const OptionsList &opts,
+                size_t min_w = 25);
 
 } // namespace argp
 

@@ -6,7 +6,7 @@
 namespace argp
 {
 
-inline split_options::split_options(const std::vector<OptionBase *> &options)
+inline split_options::split_options(const OptionsList &options)
 {
     for (auto opt : options)
     {
@@ -206,8 +206,7 @@ inline T KeywordOption<T>::get_val() const
 namespace impl
 {
 
-inline OptionBase *match_option(const char *arg,
-                                const std::vector<OptionBase *> &opts)
+inline OptionBase *match_option(const char *arg, const OptionsList &opts)
 {
     auto split_opts = split_options(opts);
 
@@ -286,7 +285,7 @@ inline std::ostream &operator<<(std::ostream &os, const indented &val)
 } // namespace impl
 
 inline std::vector<std::string> parse(int argc, const char *argv[],
-                                      const std::vector<OptionBase *> &opts,
+                                      const OptionsList &opts,
                                       int skip_first_n /* = 1 */)
 {
     std::vector<std::string> unrecognised;
@@ -309,8 +308,7 @@ inline std::vector<std::string> parse(int argc, const char *argv[],
 }
 
 inline void print_help(std::ostream &os, std::string_view cmd,
-                       const std::vector<OptionBase *> &opts,
-                       size_t min_w /* = 25 */)
+                       const OptionsList &opts, size_t min_w /* = 25 */)
 {
     auto split_opts = split_options(opts);
 
